@@ -46,17 +46,33 @@ func (zl *zapLogger) Enabled() bool {
 	return zl.l.InfoEnabled()
 }
 
+// Logs will come in with newlines, but our logger auto appends newline
+func trimNewline(msg string) string {
+	if len(msg) == 0 {
+		return msg
+	}
+	lc := len(msg) - 1
+	if msg[lc] == '\n' {
+		return msg[:lc]
+	}
+	return msg
+}
+
 func (zl *zapLogger) Info(msg string, keysAndVals ...interface{}) {
 	if zl.lvlSet && zl.lvl > debugLevelThreshold {
-		zl.l.Debug(msg, keysAndVals)
+		zl.l.Debug(trimNewline(msg), keysAndVals)
 	} else {
-		zl.l.Info(msg, keysAndVals)
+		zl.l.Info(trimNewline(msg), keysAndVals)
 	}
 }
 
 func (zl *zapLogger) Error(err error, msg string, keysAndVals ...interface{}) {
 	if zl.l.ErrorEnabled() {
-		zl.l.Error(fmt.Sprintf("%v: %s", err.Error(), msg), keysAndVals)
+		if err == nil {
+			zl.l.Error(trimNewline(msg), keysAndVals)
+		} else {
+			zl.l.Error(fmt.Sprintf("%v: %s", err.Error(), msg), keysAndVals)
+		}
 	}
 }
 
