@@ -111,12 +111,14 @@ function check_default_cluster_yaml() {
 # 1. NAME: Name of the Kind cluster (optional)
 # 2. IMAGE: Node image used by KinD (optional)
 # 3. CONFIG: KinD cluster configuration YAML file. If not specified then DEFAULT_CLUSTER_YAML is used
+# 4. KUBECONFIG: Kubeconfig file for this cluster.
 # This function returns 0 when everything goes well, or 1 otherwise
 # If Kind cluster was already created then it would be cleaned up in case of errors
 function setup_kind_cluster() {
   NAME="${1:-istio-testing}"
   IMAGE="${2:-gcr.io/istio-testing/kindest/node:v1.19.1}"
   CONFIG="${3:-}"
+  KUBECONFIG="${4:-}"
 
   check_default_cluster_yaml
 
@@ -155,6 +157,9 @@ EOF
   if [[ -n ${METRICS_SERVER_CONFIG_DIR} ]]; then
     kubectl apply -f "${METRICS_SERVER_CONFIG_DIR}"
   fi
+
+  # Install Metallb
+  install_metallb "${KUBECONFIG}"
 }
 
 ###############################################################################
@@ -205,7 +210,7 @@ EOF
     CLUSTER_KUBECONFIG="${KUBECONFIG_DIR}/${CLUSTER_NAME}"
 
     # Create the clusters.
-    KUBECONFIG="${CLUSTER_KUBECONFIG}" setup_kind_cluster "${CLUSTER_NAME}" "${IMAGE}" "${CLUSTER_YAML}"
+    KUBECONFIG="${CLUSTER_KUBECONFIG}" setup_kind_cluster "${CLUSTER_NAME}" "${IMAGE}" "${CLUSTER_YAML}" "${CLUSTER_KUBECONFIG}"
 
     # Kind currently supports getting a kubeconfig for internal or external usage. To simplify our tests,
     # its much simpler if we have a single kubeconfig that can be used internally and externally.
@@ -227,14 +232,10 @@ EOF
     wait "${pid}" || exit 1
   done
 
-  # Install MetalLB for LoadBalancer support. Must be done synchronously since METALLB_IPS is shared.
-  # and keep track of the list of Kubeconfig files that will be exported later
+  # keep track of the list of Kubeconfig files that will be exported later
   export KUBECONFIGS
   for CLUSTER_NAME in "${CLUSTER_NAMES[@]}"; do
     KUBECONFIG_FILE="${KUBECONFIG_DIR}/${CLUSTER_NAME}"
-    if [[ ${NUM_CLUSTERS} -gt 1 ]]; then
-      install_metallb "${KUBECONFIG_FILE}"
-    fi
     KUBECONFIGS+=("${KUBECONFIG_FILE}")
   done
 
